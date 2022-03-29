@@ -250,6 +250,8 @@ static bool sendFrame(void)
     case CAPTURE_FMT_RGBA   : fi->type = FRAME_TYPE_RGBA   ; break;
     case CAPTURE_FMT_RGBA10 : fi->type = FRAME_TYPE_RGBA10 ; break;
     case CAPTURE_FMT_RGBA16F: fi->type = FRAME_TYPE_RGBA16F; break;
+    case CAPTURE_FMT_DXT1   : fi->type = FRAME_TYPE_DXT1   ; break;
+    case CAPTURE_FMT_DXT5   : fi->type = FRAME_TYPE_DXT5   ; break;
     default:
       DEBUG_ERROR("Unsupported frame format %d, skipping frame", frame.format);
       return true;

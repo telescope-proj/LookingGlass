@@ -90,6 +90,20 @@ static bool egl_texFBUpdate(EGL_Texture * texture, const EGL_TexUpdate * update)
   bool damageAll = !update->rects || update->rectCount == 0 || damage->count < 0 ||
     damage->count + update->rectCount > KVMFR_MAX_DAMAGE_RECTS;
 
+  if (texture->format.compressed){
+    switch (texture->format.intFormat)
+    {
+    case 0x83F3: //GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
+      texture->format.bpp = texture->format.width * texture->format.height;
+      break;
+    case 0x83F1: //GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
+      texture->format.bpp = (texture->format.width * texture->format.height)/2;
+      break;
+    default:
+      break;
+    }
+  }
+
   if (damageAll)
     framebuffer_read(
       update->frame,

@@ -663,6 +663,16 @@ int main_frameThread(void * unused)
           dataSize       = lgrFormat.height * lgrFormat.pitch;
           lgrFormat.bpp  = 64;
           break;
+        
+        case FRAME_TYPE_DXT1:
+          lgrFormat.bpp  = 0;
+          lgrFormat.pitch = 0;
+          break;
+
+        case FRAME_TYPE_DXT5:
+          lgrFormat.bpp  = 0;
+          lgrFormat.pitch = 0;
+          break;
 
         default:
           DEBUG_ERROR("Unsupported frameType");

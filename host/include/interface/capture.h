@@ -41,6 +41,8 @@ typedef enum CaptureFormat
   CAPTURE_FMT_RGBA   ,
   CAPTURE_FMT_RGBA10 ,
   CAPTURE_FMT_RGBA16F,
+  CAPTURE_FMT_DXT1   ,
+  CAPTURE_FMT_DXT5   ,
 
   // pointer formats
   CAPTURE_FMT_COLOR ,

@@ -72,9 +72,24 @@ bool framebuffer_read(const FrameBuffer * frame, void * restrict dst,
 
   uint8_t * restrict d     = (uint8_t*)dst;
   uint_least32_t rp        = 0;
+  
+  // copy in large 1MB chunks if texture is compressed
+  if (pitch == 0)
+  {
+    while(bpp)
+    {
+      const size_t copy = bpp < FB_CHUNK_SIZE ? bpp : FB_CHUNK_SIZE;
+      if (!framebuffer_wait(frame, rp + copy))
+        return false;
 
+      memcpy(d, frame->data + rp, copy);
+      bpp -= copy;
+      rp  += copy;
+      d   += copy;
+    }
+  }
   // copy in large 1MB chunks if the pitches match
-  if (dstpitch == pitch)
+  else if (dstpitch == pitch)
   {
     size_t remaining = height * pitch;
     while(remaining)
