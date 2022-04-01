@@ -96,6 +96,24 @@ bool egl_texUtilGetFormat(const EGL_TexSetup * setup, EGL_TexFormat * fmt)
       fmt->compressed = 1;
       fmt->bufferSize = setup->width * setup->height;
       break;
+    
+    case EGL_PF_ETC2_RGB:
+      fmt->bpp        = 0;
+      fmt->format     = GL_RGB;
+      fmt->intFormat  = GL_COMPRESSED_RGB8_ETC2;
+      fmt->dataType   = GL_UNSIGNED_BYTE;
+      fmt->compressed = 1;
+      fmt->bufferSize = setup->width * setup->height / 2;
+      break;
+    
+    case EGL_PF_ETC2_RGBA:
+      fmt->bpp        = 0;
+      fmt->format     = GL_RGBA;
+      fmt->intFormat  = GL_COMPRESSED_RGBA8_ETC2_EAC;
+      fmt->dataType   = GL_UNSIGNED_BYTE;
+      fmt->compressed = 1;
+      fmt->bufferSize = setup->width * setup->height;
+      break;
 
     default:
       DEBUG_ERROR("Unsupported pixel format");

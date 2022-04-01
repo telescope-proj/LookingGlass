@@ -282,6 +282,14 @@ bool egl_desktopSetup(EGL_Desktop * desktop, const LG_RendererFormat format)
     case FRAME_TYPE_DXT5:
       pixFmt = EGL_PF_DXT5;
       break;
+
+    case FRAME_TYPE_ETC2_RGB:
+      pixFmt = EGL_PF_ETC2_RGB;
+      break;
+
+    case FRAME_TYPE_ETC2_RGBA:
+      pixFmt = EGL_PF_ETC2_RGBA;
+      break;
       
     default:
       DEBUG_ERROR("Unsupported frame format");

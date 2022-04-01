@@ -246,12 +246,14 @@ static bool sendFrame(void)
   KVMFRFrame * fi = lgmpHostMemPtr(app.frameMemory[app.frameIndex]);
   switch(frame.format)
   {
-    case CAPTURE_FMT_BGRA   : fi->type = FRAME_TYPE_BGRA   ; break;
-    case CAPTURE_FMT_RGBA   : fi->type = FRAME_TYPE_RGBA   ; break;
-    case CAPTURE_FMT_RGBA10 : fi->type = FRAME_TYPE_RGBA10 ; break;
-    case CAPTURE_FMT_RGBA16F: fi->type = FRAME_TYPE_RGBA16F; break;
-    case CAPTURE_FMT_DXT1   : fi->type = FRAME_TYPE_DXT1   ; break;
-    case CAPTURE_FMT_DXT5   : fi->type = FRAME_TYPE_DXT5   ; break;
+    case CAPTURE_FMT_BGRA     : fi->type = FRAME_TYPE_BGRA     ; break;
+    case CAPTURE_FMT_RGBA     : fi->type = FRAME_TYPE_RGBA     ; break;
+    case CAPTURE_FMT_RGBA10   : fi->type = FRAME_TYPE_RGBA10   ; break;
+    case CAPTURE_FMT_RGBA16F  : fi->type = FRAME_TYPE_RGBA16F  ; break;
+    case CAPTURE_FMT_DXT1     : fi->type = FRAME_TYPE_DXT1     ; break;
+    case CAPTURE_FMT_DXT5     : fi->type = FRAME_TYPE_DXT5     ; break;
+    case CAPTURE_FMT_ETC2_RGB : fi->type = FRAME_TYPE_ETC2_RGB ; break;
+    case CAPTURE_FMT_ETC2_RGBA: fi->type = FRAME_TYPE_ETC2_RGBA; break;
     default:
       DEBUG_ERROR("Unsupported frame format %d, skipping frame", frame.format);
       return true;

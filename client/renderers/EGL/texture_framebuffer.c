@@ -93,12 +93,16 @@ static bool egl_texFBUpdate(EGL_Texture * texture, const EGL_TexUpdate * update)
   if (texture->format.compressed){
     switch (texture->format.intFormat)
     {
-    case 0x83F3: //GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
-      texture->format.bpp = texture->format.width * texture->format.height;
-      break;
     case 0x83F1: //GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
+    case 0x9274: //GL_COMPRESSED_RGB8_ETC2
       texture->format.bpp = (texture->format.width * texture->format.height)/2;
       break;
+      
+    case 0x83F3: //GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
+    case 0x9278: //GL_COMPRESSED_RGBA8_ETC2_EAC
+      texture->format.bpp = (texture->format.width * texture->format.height);
+      break;
+
     default:
       break;
     }

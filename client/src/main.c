@@ -665,11 +665,9 @@ int main_frameThread(void * unused)
           break;
         
         case FRAME_TYPE_DXT1:
-          lgrFormat.bpp  = 0;
-          lgrFormat.pitch = 0;
-          break;
-
         case FRAME_TYPE_DXT5:
+        case FRAME_TYPE_ETC2_RGB:
+        case FRAME_TYPE_ETC2_RGBA:
           lgrFormat.bpp  = 0;
           lgrFormat.pitch = 0;
           break;

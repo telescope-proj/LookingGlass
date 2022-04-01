@@ -532,6 +532,14 @@ static bool dxgi_init(void)
     {
       transcode_mode = 5;
     }
+    else if (_strnicmp(optComp, "etc2rgba", 8) == 0)
+    {
+      transcode_mode = 3;
+    }
+    else if (_strnicmp(optComp, "etc2rgb", 7) == 0)
+    {
+      transcode_mode = 2;
+    }
   }
   else {
     transcode_mode = 0;
@@ -570,7 +578,17 @@ static bool dxgi_init(void)
     DEBUG_INFO("Transcoding Mode  : DXT1");
     this->format = CAPTURE_FMT_DXT1;
     break;
-  
+
+  case 2:
+    DEBUG_INFO("Transcoding Mode  : ETC2 RGB");
+    this->format = CAPTURE_FMT_ETC2_RGB;
+    break;
+
+  case 3:
+    DEBUG_INFO("Transcoding Mode  : ETC2 RGBA");
+    this->format = CAPTURE_FMT_ETC2_RGBA;
+    break;
+
   case 5:
     DEBUG_INFO("Transcoding Mode  : DXT5");
     this->format = CAPTURE_FMT_DXT5;
@@ -1140,6 +1158,42 @@ static CaptureResult dxgi_getFrame(FrameBuffer * frame,
       ttcEncodeDXT1(tex->map, framebuffer_get_data(frame), this->width,
         this->height, CAPTURE_FMT_RGBA);
       framebuffer_set_write_ptr(frame, this->width * this->height / 2);
+      break;
+
+    default:
+      DEBUG_FATAL("Unsupported capture format for transcoding!");
+      break;
+    }
+  }
+  else if (transcode_mode == 2)
+  {
+    switch (this->raw_format)
+    {
+    case CAPTURE_FMT_RGBA:
+      transcodeI_BGRAtoRGBA(tex->map, this->width, this->height);
+
+    case CAPTURE_FMT_BGRA:
+      ttcEncodeETC2RGB(tex->map, framebuffer_get_data(frame), this->width,
+        this->height, CAPTURE_FMT_RGBA,true);
+      framebuffer_set_write_ptr(frame, this->width * this->height / 2);
+      break;
+
+    default:
+      DEBUG_FATAL("Unsupported capture format for transcoding!");
+      break;
+    }
+  }
+  else if (transcode_mode == 3)
+  {
+    switch (this->raw_format)
+    {
+    case CAPTURE_FMT_RGBA:
+      transcodeI_RGBAtoBGRA(tex->map, this->width, this->height);
+
+    case CAPTURE_FMT_BGRA:
+      ttcEncodeETC2RGBA(tex->map, framebuffer_get_data(frame), this->width,
+                        this->height, CAPTURE_FMT_RGBA,true);
+      framebuffer_set_write_ptr(frame, this->width * this->height);
       break;
 
     default:

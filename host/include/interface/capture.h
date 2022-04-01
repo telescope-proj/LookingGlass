@@ -37,13 +37,14 @@ CaptureResult;
 typedef enum CaptureFormat
 {
   // frame formats
-  CAPTURE_FMT_BGRA   ,
-  CAPTURE_FMT_RGBA   ,
-  CAPTURE_FMT_RGBA10 ,
-  CAPTURE_FMT_RGBA16F,
-  CAPTURE_FMT_DXT1   ,
-  CAPTURE_FMT_DXT5   ,
-
+  CAPTURE_FMT_BGRA      ,
+  CAPTURE_FMT_RGBA      ,
+  CAPTURE_FMT_RGBA10    ,
+  CAPTURE_FMT_RGBA16F   ,
+  CAPTURE_FMT_DXT1      ,
+  CAPTURE_FMT_DXT5      ,
+  CAPTURE_FMT_ETC2_RGB  ,
+  CAPTURE_FMT_ETC2_RGBA ,
   // pointer formats
   CAPTURE_FMT_COLOR ,
   CAPTURE_FMT_MONO  ,
