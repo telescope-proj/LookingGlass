@@ -3,20 +3,6 @@
 #include <tmmintrin.h>
 #include <smmintrin.h>
 
-static inline size_t compressedTexSize( unsigned int encoded_bpp, size_t width, 
-                                        size_t height)
-{
-  switch (encoded_bpp)
-  {
-  case BPP_DXT1:
-	return width * height / 2;
-  case BPP_DXT5:
-	return width * height;
-  default:
-	return 0;
-  }
-}
-
 #define transcodeI_RGBAtoBGRA transcodeI_BGRAtoRGBA
 
 // In-place transcoding of BGRA to RGBA. Data must be 16-byte aligned.
