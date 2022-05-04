@@ -1,9 +1,6 @@
 [submodule "LGMP"]
 	path = repos/LGMP
 	url = https://github.com/gnif/LGMP.git
-[submodule "etcpak"]
-	path = repos/etcpak
-	url = https://github.com/telescope-proj/etcpak.git
 [submodule "repos/PureSpice"]
 	path = repos/PureSpice
 	url = https://github.com/gnif/PureSpice
@@ -13,3 +10,6 @@
 [submodule "repos/wayland-protocols"]
 	path = repos/wayland-protocols
 	url = https://gitlab.freedesktop.org/wayland/wayland-protocols.git
+[submodule "repos/libttc"]
+	path = repos/libttc
+	url = https://github.com/telescope-proj/libttc.git
