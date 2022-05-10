@@ -275,6 +275,10 @@ bool egl_desktopSetup(EGL_Desktop * desktop, const LG_RendererFormat format)
       pixFmt = EGL_PF_RGBA16F;
       break;
 
+    case FRAME_TYPE_RGB:
+      pixFmt = EGL_PF_RGB;
+      break;
+
     case FRAME_TYPE_DXT1:
       pixFmt = EGL_PF_DXT1;
       break;

@@ -38,6 +38,7 @@
 #define DRM_FORMAT_ABGR8888      fourcc_code('A', 'B', '2', '4')
 #define DRM_FORMAT_BGRA1010102   fourcc_code('B', 'A', '3', '0')
 #define DRM_FORMAT_ABGR16161616F fourcc_code('A', 'B', '4', 'H')
+#define DRM_FORMAT_RGB888        fourcc_code('R', 'G', '2', '4')
 
 bool egl_texUtilGetFormat(const EGL_TexSetup * setup, EGL_TexFormat * fmt)
 {
@@ -79,6 +80,15 @@ bool egl_texUtilGetFormat(const EGL_TexSetup * setup, EGL_TexFormat * fmt)
       fmt->compressed = 0;
       break;
 
+    case EGL_PF_RGB:
+      fmt->bpp        = 3;
+      fmt->format     = GL_RGB;
+      fmt->intFormat  = GL_RGB8;
+      fmt->dataType   = GL_UNSIGNED_BYTE;
+      fmt->fourcc     = DRM_FORMAT_RGB888;
+      fmt->compressed = 0;
+      break;
+      
     case EGL_PF_DXT1:
       fmt->bpp        = 0;
       fmt->format     = GL_RGB;

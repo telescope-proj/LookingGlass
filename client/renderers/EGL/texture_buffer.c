@@ -83,7 +83,7 @@ bool egl_texBufferSetup(EGL_Texture * texture, const EGL_TexSetup * setup)
   TextureBuffer * this = UPCAST(TextureBuffer, texture);
 
   egl_texBuffer_cleanup(this);
-
+  
   glGenTextures(this->texCount, this->tex);
   for(int i = 0; i < this->texCount; ++i)
   {
@@ -101,15 +101,16 @@ bool egl_texBufferSetup(EGL_Texture * texture, const EGL_TexSetup * setup)
     }
     else
     {
+
       glTexImage2D(GL_TEXTURE_2D,
-          0,
-          texture->format.intFormat,
-          texture->format.width,
-          texture->format.height,
-          0,
-          texture->format.format,
-          texture->format.dataType,
-          NULL);
+        0,
+        texture->format.intFormat,
+        texture->format.width,
+        texture->format.height,
+        0,
+        texture->format.format,
+        texture->format.dataType,
+        NULL);
     }
   }
 
@@ -123,10 +124,10 @@ static bool egl_texBufferUpdate(EGL_Texture * texture, const EGL_TexUpdate * upd
 {
   TextureBuffer * this = UPCAST(TextureBuffer, texture);
   DEBUG_ASSERT(update->type == EGL_TEXTYPE_BUFFER);
+  glBindTexture(GL_TEXTURE_2D, this->tex[0]);
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, texture->format.pitch);
   if (texture->format.compressed)
   {
-    glBindTexture(GL_TEXTURE_2D, this->tex[0]);
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, texture->format.pitch);
     glCompressedTexSubImage2D(GL_TEXTURE_2D,
       0,
       0,
@@ -139,8 +140,6 @@ static bool egl_texBufferUpdate(EGL_Texture * texture, const EGL_TexUpdate * upd
   }
   else
   {
-    glBindTexture(GL_TEXTURE_2D, this->tex[0]);
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, texture->format.pitch);
     glTexSubImage2D(GL_TEXTURE_2D,
         0, 0, 0,
         texture->format.width,

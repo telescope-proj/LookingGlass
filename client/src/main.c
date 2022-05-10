@@ -664,6 +664,11 @@ int main_frameThread(void * unused)
           lgrFormat.bpp  = 64;
           break;
         
+        case FRAME_TYPE_RGB:
+          dataSize       = lgrFormat.height * lgrFormat.pitch;
+          lgrFormat.bpp  = 24;
+          break;
+        
         case FRAME_TYPE_DXT1:
         case FRAME_TYPE_DXT5:
         case FRAME_TYPE_ETC2_RGB:
