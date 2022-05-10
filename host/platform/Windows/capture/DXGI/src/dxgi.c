@@ -31,7 +31,6 @@
 #include "common/KVMFR.h"
 #include "common/transcode.h"
 
-#include "ttc.h"
 
 #include <stdatomic.h>
 #include <unistd.h>
@@ -143,13 +142,6 @@ static void dxgi_initOptions(void)
       .description    = "Enable Direct3D debugging (developers only, massive performance penalty)",
       .type           = OPTION_TYPE_BOOL,
       .value.x_bool   = false
-    },
-    {
-      .module         = "dxgi",
-      .name           = "compression",
-      .description    = "Set texture compression mode (off, dxt1, dxt5)",
-      .type           = OPTION_TYPE_STRING,
-      .value.x_string = "off"
     },
     {0}
   };
@@ -521,81 +513,58 @@ static bool dxgi_init(void)
 
   this->bpp = 4;
 
-  const char* optComp = option_get_string("dxgi", "compression");
+  const char* optComp = option_get_string("app", "transcode");
   if (optComp)
   {
     if (_strnicmp(optComp, "dxt1", 4) == 0)
     {
-      transcode_mode = 1;
+      this->out_format = FRAME_TYPE_DXT1;
     }
     else if (_strnicmp(optComp, "dxt5", 4) == 0)
     {
-      transcode_mode = 5;
+      this->out_format = FRAME_TYPE_DXT5;
     }
     else if (_strnicmp(optComp, "etc2rgba", 8) == 0)
     {
-      transcode_mode = 3;
+      this->out_format = FRAME_TYPE_ETC2_RGBA;
     }
     else if (_strnicmp(optComp, "etc2rgb", 7) == 0)
     {
-      transcode_mode = 2;
+      this->out_format = FRAME_TYPE_ETC2_RGB;
     }
+    else if (_strnicmp(optComp, "rgb", 3) == 0)
+    {
+      this->out_format = FRAME_TYPE_RGB;
+    }
+    DEBUG_INFO("Transcoded Format : %s", FrameTypeStr[this->out_format]);
   }
-  else {
+  else 
+  {
     transcode_mode = 0;
+    this->out_format = FRAME_TYPE_INVALID;
   }
   switch(dupDesc.ModeDesc.Format)
   {
     case DXGI_FORMAT_B8G8R8A8_UNORM    : 
       this->format = CAPTURE_FMT_BGRA   ; 
-      this->raw_format = CAPTURE_FMT_BGRA;
       break;
 
     case DXGI_FORMAT_R8G8B8A8_UNORM    : 
       this->format = CAPTURE_FMT_RGBA   ;
-      this->raw_format = CAPTURE_FMT_RGBA;
       break;
 
     case DXGI_FORMAT_R10G10B10A2_UNORM : 
       this->format = CAPTURE_FMT_RGBA10 ; 
-      this->raw_format = CAPTURE_FMT_RGBA10;
       break;
 
     case DXGI_FORMAT_R16G16B16A16_FLOAT:
       this->format = CAPTURE_FMT_RGBA16F;
-      this->raw_format = CAPTURE_FMT_RGBA16F;
       this->bpp = 8;
       break;
 
     default:
       DEBUG_ERROR("Unsupported source format");
       goto fail;
-  }
-
-  switch (transcode_mode)
-  {
-  case 1:
-    DEBUG_INFO("Transcoding Mode  : DXT1");
-    this->format = CAPTURE_FMT_DXT1;
-    break;
-
-  case 2:
-    DEBUG_INFO("Transcoding Mode  : ETC2 RGB");
-    this->format = CAPTURE_FMT_ETC2_RGB;
-    break;
-
-  case 3:
-    DEBUG_INFO("Transcoding Mode  : ETC2 RGBA");
-    this->format = CAPTURE_FMT_ETC2_RGBA;
-    break;
-
-  case 5:
-    DEBUG_INFO("Transcoding Mode  : DXT5");
-    this->format = CAPTURE_FMT_DXT5;
-    break;
-
-  default:
-    DEBUG_INFO("Transcoding Mode  : Disabled");
   }
 
   const char * copyBackend = option_get_string("dxgi", "copyBackend");
@@ -1087,14 +1056,21 @@ static CaptureResult dxgi_waitFrame(CaptureFrame * frame, const size_t maxFrameS
 
   const unsigned int maxHeight = maxFrameSize / this->pitch;
 
-  frame->formatVer        = tex->formatVer;
-  frame->width            = this->width;
-  frame->height           = maxHeight > this->height ? this->height : maxHeight;
-  frame->realHeight       = this->height;
-  frame->pitch            = this->pitch;
-  frame->stride           = this->stride;
-  frame->format           = this->format;
-  frame->rotation         = this->rotation;
+  frame->formatVer         = tex->formatVer;
+  frame->width             = this->width;
+  frame->height            = maxHeight > this->height ? this->height : maxHeight;
+  frame->realHeight        = this->height;
+  frame->pitch             = this->pitch;
+  frame->stride            = this->stride;
+  frame->format            = this->format;
+  // frame->transcode_format = this->out_format;
+  frame->transcoded.valid  = true;
+  frame->transcoded.width  = this->width;
+  frame->transcoded.height = this->height;
+  frame->transcoded.type   = this->out_format;
+  frame->rotation          = this->rotation;
+
+  setTexConvParam(frame);
 
   frame->damageRectsCount = tex->damageRectsCount;
   memcpy(frame->damageRects, tex->damageRects,
@@ -1116,9 +1092,11 @@ static CaptureResult dxgi_getFrame(FrameBuffer * frame,
   bool damageAll = tex->damageRectsCount == 0 || damage->count < 0 ||
       damage->count + tex->damageRectsCount > KVMFR_MAX_DAMAGE_RECTS;
 
-  if (transcode_mode == 0)
+  // No transcoding was requested, normal path
+
+  if (this->out_format == FRAME_TYPE_INVALID)
   {
-    // No transcoding
+    DEBUG_INFO("DAMAGE ALL");
     if (damageAll)
     {
       framebuffer_write(frame, tex->map, this->pitch * height);
@@ -1126,7 +1104,7 @@ static CaptureResult dxgi_getFrame(FrameBuffer * frame,
     else
     {
       memcpy(damage->rects + damage->count, tex->damageRects,
-        tex->damageRectsCount * sizeof(*tex->damageRects));
+      tex->damageRectsCount * sizeof(*tex->damageRects));
       damage->count += tex->damageRectsCount;
       rectsBufferToFramebuffer(damage->rects, damage->count, frame, this->pitch,
         height, tex->map, this->pitch);
@@ -1147,77 +1125,19 @@ static CaptureResult dxgi_getFrame(FrameBuffer * frame,
       }
     }
   }
-  else if (transcode_mode == 1)
+  else
   {
-    switch (this->raw_format)
-    {
-    case CAPTURE_FMT_BGRA:
-      transcodeI_BGRAtoRGBA(tex->map, this->width, this->height);
+    int in_fmt = captureFormatToTtcFormat(this->format);
+    int out_fmt = frameTypeToTtcFormat(this->out_format);
+    DEBUG_INFO("src->format = %d\ndst->format = %d", in_fmt, out_fmt);
+    int ret = ttcTranscode(tex->map, framebuffer_get_data(frame),
+                       this->width, this->height, in_fmt, out_fmt, 
+                       0);
+    if (ret != 0)
+      return CAPTURE_RESULT_ERROR;
 
-    case CAPTURE_FMT_RGBA:
-      ttcEncodeDXT1(tex->map, framebuffer_get_data(frame), this->width,
-        this->height, CAPTURE_FMT_RGBA);
-      framebuffer_set_write_ptr(frame, this->width * this->height / 2);
-      break;
-
-    default:
-      DEBUG_FATAL("Unsupported capture format for transcoding!");
-      break;
-    }
-  }
-  else if (transcode_mode == 2)
-  {
-    switch (this->raw_format)
-    {
-    case CAPTURE_FMT_RGBA:
-      transcodeI_BGRAtoRGBA(tex->map, this->width, this->height);
-
-    case CAPTURE_FMT_BGRA:
-      ttcEncodeETC2RGB(tex->map, framebuffer_get_data(frame), this->width,
-        this->height, CAPTURE_FMT_RGBA,true);
-      framebuffer_set_write_ptr(frame, this->width * this->height / 2);
-      break;
-
-    default:
-      DEBUG_FATAL("Unsupported capture format for transcoding!");
-      break;
-    }
-  }
-  else if (transcode_mode == 3)
-  {
-    switch (this->raw_format)
-    {
-    case CAPTURE_FMT_RGBA:
-      transcodeI_RGBAtoBGRA(tex->map, this->width, this->height);
-
-    case CAPTURE_FMT_BGRA:
-      ttcEncodeETC2RGBA(tex->map, framebuffer_get_data(frame), this->width,
-                        this->height, CAPTURE_FMT_RGBA,true);
-      framebuffer_set_write_ptr(frame, this->width * this->height);
-      break;
-
-    default:
-      DEBUG_FATAL("Unsupported capture format for transcoding!");
-      break;
-    }
-  }
-  else if (transcode_mode == 5)
-  {
-    switch (this->raw_format)
-    {
-    case CAPTURE_FMT_BGRA:
-      transcodeI_BGRAtoRGBA(tex->map, this->width, this->height);
-
-    case CAPTURE_FMT_RGBA:
-      ttcEncodeDXT5(tex->map, framebuffer_get_data(frame), this->width,
-        this->height, CAPTURE_FMT_RGBA);
-      framebuffer_set_write_ptr(frame, this->width * this->height);
-      break;
-
-    default:
-      DEBUG_FATAL("Unsupported capture format for transcoding!");
-      break;
-    }
+    framebuffer_set_write_ptr(frame, 
+      ttcGetSize(this->width, this->height, out_fmt));
   }
 
   this->backend->unmapTexture(tex);
