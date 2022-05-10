@@ -49,7 +49,6 @@
 
 // locals
 static struct DXGIInterface * this = NULL;
-uint32_t transcode_mode = 0;
 
 extern struct DXGICopyBackend copyBackendD3D11;
 extern struct DXGICopyBackend copyBackendD3D12;
@@ -512,7 +511,7 @@ static bool dxgi_init(void)
   DEBUG_INFO("Source Format     : %s", GetDXGIFormatStr(this->dxgiFormat));
 
   this->bpp = 4;
-
+  this->out_format = FRAME_TYPE_INVALID;
   const char* optComp = option_get_string("app", "transcode");
   if (optComp)
   {
@@ -536,13 +535,16 @@ static bool dxgi_init(void)
     {
       this->out_format = FRAME_TYPE_RGB;
     }
+    
+    if (this->out_format != FRAME_TYPE_INVALID && !this->disableDamage)
+    {
+      this->disableDamage = true;
+      DEBUG_INFO("Damage incompatible with transcode option");
+    }
+
     DEBUG_INFO("Transcoded Format : %s", FrameTypeStr[this->out_format]);
   }
-  else 
-  {
-    transcode_mode = 0;
-    this->out_format = FRAME_TYPE_INVALID;
-  }
+  
   switch(dupDesc.ModeDesc.Format)
   {
     case DXGI_FORMAT_B8G8R8A8_UNORM    : 
