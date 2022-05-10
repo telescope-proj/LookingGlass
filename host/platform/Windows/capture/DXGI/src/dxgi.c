@@ -1096,7 +1096,6 @@ static CaptureResult dxgi_getFrame(FrameBuffer * frame,
 
   if (this->out_format == FRAME_TYPE_INVALID)
   {
-    DEBUG_INFO("DAMAGE ALL");
     if (damageAll)
     {
       framebuffer_write(frame, tex->map, this->pitch * height);
@@ -1129,12 +1128,14 @@ static CaptureResult dxgi_getFrame(FrameBuffer * frame,
   {
     int in_fmt = captureFormatToTtcFormat(this->format);
     int out_fmt = frameTypeToTtcFormat(this->out_format);
-    DEBUG_INFO("src->format = %d\ndst->format = %d", in_fmt, out_fmt);
     int ret = ttcTranscode(tex->map, framebuffer_get_data(frame),
                        this->width, this->height, in_fmt, out_fmt, 
                        0);
     if (ret != 0)
+    {
+      DEBUG_INFO("Unsupported transcode format!");
       return CAPTURE_RESULT_ERROR;
+    }
 
     framebuffer_set_write_ptr(frame, 
       ttcGetSize(this->width, this->height, out_fmt));
