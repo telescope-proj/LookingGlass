@@ -31,7 +31,7 @@
 #include "common/KVMFR.h"
 #include "common/transcode.h"
 
-#include "ttc_wrapper.h"
+#include "ttc.h"
 
 #include <stdatomic.h>
 #include <unistd.h>
