@@ -1167,7 +1167,6 @@ static CaptureResult dxgi_waitFrame(CaptureFrame * frame, const size_t maxFrameS
   frame->stride            = this->stride;
   frame->format            = this->format;
   frame->rotation          = this->rotation;
-  frame->transcoded.valid  = true;
   frame->transcoded.width  = this->width;
   frame->transcoded.height = this->height;
   frame->transcoded.type   = this->out_format;

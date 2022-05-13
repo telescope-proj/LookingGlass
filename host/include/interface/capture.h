@@ -66,12 +66,11 @@ CaptureRotation;
 
 typedef struct TranscodeFrame
 {
-  bool            valid; // Whether transcoding should be performed
   unsigned int    width;
   unsigned int    height;
   unsigned int    pitch;
   unsigned int    stride;
-  FrameType       type;
+  FrameType       type; // No transcode requested => FRAME_TYPE_INVALID
   CaptureRotation rotation;
 } TranscodeFrame;
 

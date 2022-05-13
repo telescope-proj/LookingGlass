@@ -297,14 +297,16 @@ static bool sendFrame(void)
       break;
   }
 
+  bool do_xc = (frame.transcoded.type != FRAME_TYPE_INVALID);
+
   fi->formatVer         = frame.formatVer;
   fi->frameSerial       = app.frameSerial++;
   fi->screenWidth       = frame.screenWidth;
   fi->screenHeight      = frame.screenHeight;
   fi->frameWidth        = frame.frameWidth;
   fi->frameHeight       = frame.frameHeight;
-  fi->stride            = frame.stride;
-  fi->pitch             = frame.pitch;
+  fi->stride            = do_xc ? frame.transcoded.stride : frame.stride;
+  fi->pitch             = do_xc ? frame.transcoded.pitch : frame.pitch;
   fi->offset            = app.pageSize - FrameBufferStructSize;
   fi->flags             =
     (os_blockScreensaver() ?
