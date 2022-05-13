@@ -301,8 +301,10 @@ static bool sendFrame(void)
   fi->frameSerial       = app.frameSerial++;
   fi->screenWidth       = frame.screenWidth;
   fi->screenHeight      = frame.screenHeight;
-  fi->stride            = frame.transcoded.valid ? frame.transcoded.stride : frame.stride;
-  fi->pitch             = frame.transcoded.pitch ? frame.transcoded.pitch : frame.transcoded.pitch;
+  fi->frameWidth        = frame.frameWidth;
+  fi->frameHeight       = frame.frameHeight;
+  fi->stride            = frame.stride;
+  fi->pitch             = frame.pitch;
   fi->offset            = app.pageSize - FrameBufferStructSize;
   fi->flags             =
     (os_blockScreensaver() ?
