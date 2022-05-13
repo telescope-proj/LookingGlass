@@ -44,8 +44,8 @@ typedef enum CaptureFormat
   CAPTURE_FMT_RGB       ,
   CAPTURE_FMT_DXT1      ,
   CAPTURE_FMT_DXT5      ,
-  CAPTURE_FMT_ETC2_RGB  ,
-  CAPTURE_FMT_ETC2_RGBA ,
+  CAPTURE_FMT_ETC2      ,
+  CAPTURE_FMT_ETC2_EAC  ,
   // pointer formats
   CAPTURE_FMT_COLOR ,
   CAPTURE_FMT_MONO  ,
@@ -78,9 +78,11 @@ typedef struct TranscodeFrame
 typedef struct CaptureFrame
 {
   unsigned int    formatVer;
-  unsigned int    width;
-  unsigned int    height;
-  unsigned int    realHeight;
+  unsigned int    screenWidth;
+  unsigned int    screenHeight;
+  unsigned int    frameWidth;
+  unsigned int    frameHeight;
+  bool            truncated;
   unsigned int    pitch;
   unsigned int    stride;
   CaptureFormat   format;

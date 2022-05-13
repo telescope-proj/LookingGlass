@@ -58,8 +58,8 @@ typedef enum FrameType
   FRAME_TYPE_RGB       , // RGB  interleaved: R,G,B 24bpp
   FRAME_TYPE_DXT1      , // DXT1 texture block compression
   FRAME_TYPE_DXT5      , // DXT5 texture block compression
-  FRAME_TYPE_ETC2_RGB  , // ETC2 RGB texture block compression
-  FRAME_TYPE_ETC2_RGBA , // ETC2 RGBA texture block compression
+  FRAME_TYPE_ETC2      , // ETC2 RGB texture block compression
+  FRAME_TYPE_ETC2_EAC  , // ETC2 RGBA texture block compression
   FRAME_TYPE_MAX       , // sentinel value
 }
 FrameType;

@@ -30,7 +30,7 @@
 #include "common/runningavg.h"
 #include "common/KVMFR.h"
 #include "common/transcode.h"
-
+#include "common/vector.h"
 
 #include <stdatomic.h>
 #include <unistd.h>
@@ -46,6 +46,18 @@
 #include "dxgi_capture.h"
 
 #define LOCKED(...) INTERLOCKED_SECTION(this->deviceContextLock, __VA_ARGS__)
+
+typedef struct
+{
+  unsigned int id;
+  bool         greater;
+  unsigned int x;
+  unsigned int y;
+  unsigned int level;
+}
+DownsampleRule;
+
+static Vector downsampleRules = {0};
 
 // locals
 static struct DXGIInterface * this = NULL;
@@ -75,6 +87,58 @@ static const char * dxgi_getName(void)
   return name;
 }
 
+static bool downsampleOptParser(struct Option * opt, const char * str)
+{
+  if (!str)
+    return false;
+
+  opt->value.x_string = strdup(str);
+
+  if (downsampleRules.data)
+    vector_destroy(&downsampleRules);
+
+  if (!vector_create(&downsampleRules, sizeof(DownsampleRule), 10))
+  {
+    DEBUG_ERROR("Failed to allocate ram");
+    return false;
+  }
+
+  char * tmp   = strdup(str);
+  char * token = strtok(tmp, ",");
+  int count = 0;
+  while(token)
+  {
+    DownsampleRule rule = {0};
+    if (token[0] == '>')
+    {
+      rule.greater = true;
+      ++token;
+    }
+
+    if (sscanf(token, "%ux%u:%u", &rule.x, &rule.y, &rule.level) != 3)
+      return false;
+
+    rule.id = count++;
+
+    DEBUG_INFO(
+      "Rule %u: %u%% IF X %s %4u %s Y %s %4u",
+      rule.id,
+      100 / (1 << rule.level),
+      rule.greater ? "> "  : "==",
+      rule.x,
+      rule.greater ? "OR " : "AND",
+      rule.greater ? "> "  : "==",
+      rule.y
+    );
+    vector_push(&downsampleRules, &rule);
+
+    token = strtok(NULL, ",");
+  }
+  free(tmp);
+
+  return true;
+}
+
 static void dxgi_initOptions(void)
 {
   struct Option options[] =
@@ -92,6 +156,14 @@ static void dxgi_initOptions(void)
       .description    = "The name of the adapter's output to capture",
       .type           = OPTION_TYPE_STRING,
       .value.x_string = NULL
+    },
+    {
+      .module         = "dxgi",
+      .name           = "downsample", //dxgi:downsample=1920x1200:1,
+      .description    = "Downsample conditions and levels, format: [>](width)x(height):level",
+      .type           = OPTION_TYPE_STRING,
+      .value.x_string = NULL,
+      .parser         = downsampleOptParser
     },
     {
       .module         = "dxgi",
@@ -523,13 +595,13 @@ static bool dxgi_init(void)
     {
       this->out_format = FRAME_TYPE_DXT5;
     }
-    else if (_strnicmp(optComp, "etc2rgba", 8) == 0)
+    else if (_strnicmp(optComp, "etc2eac", 8) == 0)
     {
-      this->out_format = FRAME_TYPE_ETC2_RGBA;
+      this->out_format = FRAME_TYPE_ETC2_EAC;
     }
-    else if (_strnicmp(optComp, "etc2rgb", 7) == 0)
+    else if (_strnicmp(optComp, "etc2", 7) == 0)
     {
-      this->out_format = FRAME_TYPE_ETC2_RGB;
+      this->out_format = FRAME_TYPE_ETC2;
     }
     else if (_strnicmp(optComp, "rgb", 3) == 0)
     {
@@ -569,6 +641,31 @@ static bool dxgi_init(void)
       goto fail;
   }
 
+  this->downsampleLevel = 0;
+  this->targetWidth     = this->width;
+  this->targetHeight    = this->height;
+
+  DownsampleRule * rule, * match = NULL;
+  vector_forEachRef(rule, &downsampleRules)
+  {
+    if (
+      ( rule->greater && (this->width  > rule->x || this->height  > rule->y)) ||
+      (!rule->greater && (this->width == rule->x && this->height == rule->y)))
+    {
+      match = rule;
+    }
+  }
+
+  if (match)
+  {
+    DEBUG_INFO("Matched downsample rule %d", rule->id);
+    this->downsampleLevel = match->level;
+    this->targetWidth   >>= match->level;
+    this->targetHeight  >>= match->level;
+  }
+
+  DEBUG_INFO("Request Size      : %u x %u", this->targetWidth, this->targetHeight);
+
   const char * copyBackend = option_get_string("dxgi", "copyBackend");
   for (int i = 0; i < ARRAY_LENGTH(backends); ++i)
   {
@@ -584,6 +681,8 @@ static bool dxgi_init(void)
       break;
     }
   }
+
+  DEBUG_INFO("Output Size       : %u x %u", this->targetWidth, this->targetHeight);
 
   if (!this->backend)
   {
@@ -732,10 +831,10 @@ static void rectToFrameDamageRect(RECT * src, FrameDamageRect * dst)
 {
   *dst = (FrameDamageRect)
   {
-    .x = src->left,
-    .y = src->top,
-    .width = src->right - src->left,
-    .height = src->bottom - src->top
+    .x      = src->left                >> this->downsampleLevel,
+    .y      = src->top                 >> this->downsampleLevel,
+    .width  = (src->right - src->left) >> this->downsampleLevel,
+    .height = (src->bottom - src->top) >> this->downsampleLevel
   };
 }
 
@@ -1059,21 +1158,21 @@ static CaptureResult dxgi_waitFrame(CaptureFrame * frame, const size_t maxFrameS
   const unsigned int maxHeight = maxFrameSize / this->pitch;
 
   frame->formatVer         = tex->formatVer;
-  frame->width             = this->width;
-  frame->height            = maxHeight > this->height ? this->height : maxHeight;
-  frame->realHeight        = this->height;
+  frame->screenWidth       = this->width;
+  frame->screenHeight      = this->height;
+  frame->frameWidth        = this->targetWidth;
+  frame->frameHeight       = min(maxHeight, this->targetHeight);
+  frame->truncated         = maxHeight < this->targetHeight;
   frame->pitch             = this->pitch;
   frame->stride            = this->stride;
   frame->format            = this->format;
-  // frame->transcode_format = this->out_format;
+  frame->rotation          = this->rotation;
   frame->transcoded.valid  = true;
   frame->transcoded.width  = this->width;
   frame->transcoded.height = this->height;
   frame->transcoded.type   = this->out_format;
-  frame->rotation          = this->rotation;
 
   setTexConvParam(frame);
-
   frame->damageRectsCount = tex->damageRectsCount;
   memcpy(frame->damageRects, tex->damageRects,
       tex->damageRectsCount * sizeof(*tex->damageRects));
@@ -1133,6 +1232,7 @@ static CaptureResult dxgi_getFrame(FrameBuffer * frame,
     int ret = ttcTranscode(tex->map, framebuffer_get_data(frame),
                        this->width, this->height, in_fmt, out_fmt, 
                        0);
+
     if (ret != 0)
     {
       DEBUG_INFO("Unsupported transcode format!");

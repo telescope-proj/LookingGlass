@@ -287,11 +287,11 @@ bool egl_desktopSetup(EGL_Desktop * desktop, const LG_RendererFormat format)
       pixFmt = EGL_PF_DXT5;
       break;
 
-    case FRAME_TYPE_ETC2_RGB:
+    case FRAME_TYPE_ETC2:
       pixFmt = EGL_PF_ETC2_RGB;
       break;
 
-    case FRAME_TYPE_ETC2_RGBA:
+    case FRAME_TYPE_ETC2_EAC:
       pixFmt = EGL_PF_ETC2_RGBA;
       break;
       
@@ -300,14 +300,14 @@ bool egl_desktopSetup(EGL_Desktop * desktop, const LG_RendererFormat format)
       return false;
   }
 
-  desktop->width  = format.width;
-  desktop->height = format.height;
+  desktop->width  = format.frameWidth;
+  desktop->height = format.frameHeight;
 
   if (!egl_textureSetup(
     desktop->texture,
     pixFmt,
-    format.width,
-    format.height,
+    format.frameWidth,
+    format.frameHeight,
     format.pitch
   ))
   {

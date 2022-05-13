@@ -93,8 +93,9 @@ struct DXGIInterface
   LGEvent                  * frameEvent;
 
   unsigned int    formatVer;
-  unsigned int    width;
-  unsigned int    height;
+  unsigned int    width , targetWidth ;
+  unsigned int    height, targetHeight;
+  unsigned int    downsampleLevel;
   unsigned int    pitch;
   unsigned int    stride;
   unsigned int    bpp;

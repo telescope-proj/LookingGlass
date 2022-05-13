@@ -37,10 +37,10 @@ static inline size_t getTexConvSize(TexConvInfo * info)
     case FRAME_TYPE_RGBA10:
       return info->width * info->height * 4;
     case FRAME_TYPE_DXT1:
-    case FRAME_TYPE_ETC2_RGB:
+    case FRAME_TYPE_ETC2:
       return info->width * info->height / 2;
     case FRAME_TYPE_DXT5:
-    case FRAME_TYPE_ETC2_RGBA:
+    case FRAME_TYPE_ETC2_EAC:
       return info->width * info->height;
     case FRAME_TYPE_RGBA16F:
       return info->width * info->height * 8;
@@ -71,10 +71,10 @@ static inline int captureFormatToFrameFormat(CaptureFormat fmt)
       return FRAME_TYPE_DXT1;
     case CAPTURE_FMT_DXT5:
       return FRAME_TYPE_DXT5;
-    case CAPTURE_FMT_ETC2_RGB:
-      return FRAME_TYPE_ETC2_RGB;
-    case CAPTURE_FMT_ETC2_RGBA:
-      return FRAME_TYPE_ETC2_RGBA;
+    case CAPTURE_FMT_ETC2:
+      return FRAME_TYPE_ETC2;
+    case CAPTURE_FMT_ETC2_EAC:
+      return FRAME_TYPE_ETC2_EAC;
     default:
       return -1;
   }
@@ -98,9 +98,9 @@ static inline int frameTypeToTtcFormat(FrameType fmt)
       return TTC_FMT_DXT1;
     case FRAME_TYPE_DXT5:
       return TTC_FMT_DXT5;
-    case FRAME_TYPE_ETC2_RGB:
+    case FRAME_TYPE_ETC2:
       return TTC_FMT_ETC2;
-    case FRAME_TYPE_ETC2_RGBA:
+    case FRAME_TYPE_ETC2_EAC:
       return TTC_FMT_ETC2_EAC;
     default:
       return TTC_FMT_INVALID;
@@ -125,9 +125,9 @@ static inline int captureFormatToTtcFormat(FrameType fmt)
       return TTC_FMT_DXT1;
     case CAPTURE_FMT_DXT5:
       return TTC_FMT_DXT5;
-    case CAPTURE_FMT_ETC2_RGB:
+    case CAPTURE_FMT_ETC2:
       return TTC_FMT_ETC2;
-    case CAPTURE_FMT_ETC2_RGBA:
+    case CAPTURE_FMT_ETC2_EAC:
       return TTC_FMT_ETC2_EAC;
     default:
       return TTC_FMT_INVALID;
@@ -159,11 +159,11 @@ static inline void setTexConvParam(CaptureFrame * frame)
         break;
       case  FRAME_TYPE_DXT1:
       case  FRAME_TYPE_DXT5:
-      case  FRAME_TYPE_ETC2_RGB:
-      case  FRAME_TYPE_ETC2_RGBA:
+      case  FRAME_TYPE_ETC2:
+      case  FRAME_TYPE_ETC2_EAC:
         TexConvInfo info;
-        info.width    = frame->width;
-        info.height   = frame->height;
+        info.width    = frame->frameWidth;
+        info.height   = frame->frameHeight;
         info.type     = captureFormatToFrameFormat(frame->format);
         frame->pitch  = getTexConvSize(&info);
         frame->stride = 0;
