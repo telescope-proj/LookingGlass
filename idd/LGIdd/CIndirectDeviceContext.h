@@ -83,6 +83,7 @@ private:
   int         m_pitch    = 0;
   DXGI_FORMAT m_format   = DXGI_FORMAT_UNKNOWN;
   bool        m_hasFrame = false;
+  size_t      m_lastFramePostSize = 0;
 
   void DeInitLGMP();
   void LGMPTimer();

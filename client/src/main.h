@@ -229,6 +229,11 @@ struct AppParams
   bool                 micShowIndicator;
   enum MicDefaultState micDefaultState;
   bool                 audioSyncVolume;
+
+#ifdef ENABLE_FABRIC
+  const char *         localUri;
+  const char *         remoteUri;
+#endif
 };
 
 struct CBRequest

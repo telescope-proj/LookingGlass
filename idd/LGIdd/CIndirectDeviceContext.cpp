@@ -480,7 +480,7 @@ bool CIndirectDeviceContext::SetupLGMP(size_t alignSize)
 
   for (int i = 0; i < LGMP_Q_POINTER_LEN; ++i)
   {
-    if ((status = lgmpHostMemAlloc(m_lgmp, MAX_POINTER_SIZE, &m_pointerMemory[i])) != LGMP_OK)
+    if ((status = lgmpHostMemAlloc(m_pointerQueue, MAX_POINTER_SIZE, &m_pointerMemory[i])) != LGMP_OK)
     {
       DEBUG_ERROR("lgmpHostMemAlloc Failed (Pointer): %s", lgmpStatusString(status));
       return false;
@@ -490,7 +490,7 @@ bool CIndirectDeviceContext::SetupLGMP(size_t alignSize)
 
   for (int i = 0; i < POINTER_SHAPE_BUFFERS; ++i)
   {
-    if ((status = lgmpHostMemAlloc(m_lgmp, MAX_POINTER_SIZE, &m_pointerShapeMemory[i])) != LGMP_OK)
+    if ((status = lgmpHostMemAlloc(m_pointerQueue, MAX_POINTER_SIZE, &m_pointerShapeMemory[i])) != LGMP_OK)
     {
       DEBUG_ERROR("lgmpHostMemAlloc Failed (Pointer Shapes): %s", lgmpStatusString(status));
       return false;
@@ -619,7 +619,8 @@ void CIndirectDeviceContext::LGMPTimer()
   if (lgmpHostQueueNewSubs(m_frameQueue) && m_monitor)
   {
     if (m_hasFrame)
-      lgmpHostQueuePost(m_frameQueue, 0, m_frameMemory[m_frameIndex]);
+      lgmpHostQueuePostSized(m_frameQueue, 0, m_frameMemory[m_frameIndex],
+        m_lastFramePostSize);
   }
 
   if (lgmpHostQueueNewSubs(m_pointerQueue))
@@ -686,7 +687,14 @@ CIndirectDeviceContext::PreparedFrameBuffer CIndirectDeviceContext::PrepareFrame
   FrameBuffer* fb = m_frameBuffer[m_frameIndex];  
   fb->wp = 0;
 
-  lgmpHostQueuePost(m_frameQueue, 0, m_frameMemory[m_frameIndex]);
+  // compute the actual post size: header + alignment gap + FrameBuffer + pixel data
+  size_t frameDataSize = (size_t)height * pitch;
+  size_t framePostSize = fi->offset + sizeof(FrameBuffer) + frameDataSize;
+  framePostSize = (framePostSize + (m_alignSize - 1)) & ~(m_alignSize - 1);
+  m_lastFramePostSize = framePostSize;
+
+  lgmpHostQueuePostSized(m_frameQueue, 0, m_frameMemory[m_frameIndex],
+    framePostSize);
 
   result.frameIndex = m_frameIndex;
   result.mem        = fb->data;

@@ -107,6 +107,7 @@ struct app
   unsigned int   readIndex;
   bool           frameValid;
   uint32_t       frameSerial;
+  size_t         lastFramePostSize;
 
   CaptureInterface * iface;
   bool captureStarted;
@@ -116,6 +117,7 @@ struct app
   LGTimer  * lgmpTimer;
   LGThread * frameThread;
   bool threadsStarted;
+  bool useSHM;
 };
 
 static struct app app;
@@ -162,6 +164,29 @@ static struct Option options[] =
     .type           = OPTION_TYPE_INT,
     .value.x_int    = 0,
   },
+#ifdef ENABLE_FABRIC
+  {
+    .module         = "fabric",
+    .name           = "localUri",
+    .description    = "URI of fabric transport to use instead of IVSHMEM (e.g. rdma://HOST:PORT)",
+    .type           = OPTION_TYPE_STRING,
+    .value.x_string = NULL,
+  },
+  {
+    .module         = "fabric",
+    .name           = "frameSizeLimit",
+    .description    = "Cap the allowed frame size to this value in MiB (fabric transport only)",
+    .type           = OPTION_TYPE_INT,
+    .value.x_int    = 64,
+  },
+  {
+    .module         = "fabric",
+    .name           = "debug",
+    .description    = "Enable debug logging for the fabric transport",
+    .type           = OPTION_TYPE_BOOL,
+    .value.x_bool   = false,
+  },
+#endif
   {0}
 };
 
@@ -271,8 +296,9 @@ static bool sendFrame(CaptureResult result, bool * restart)
   // if we are repeating a frame just send the last frame again
   if (repeatFrame)
   {
-    if ((status = lgmpHostQueuePost(app.frameQueue, 0,
-           app.frameMemory[app.readIndex])) != LGMP_OK)
+    if ((status = lgmpHostQueuePostSized(app.frameQueue, 0,
+           app.frameMemory[app.readIndex],
+           app.lastFramePostSize)) != LGMP_OK)
       DEBUG_ERROR("%s", lgmpStatusString(status));
     return true;
   }
@@ -355,18 +381,44 @@ static bool sendFrame(CaptureResult result, bool * restart)
 
   framebuffer_prepare(app.frameBuffer[app.captureIndex]);
 
-  /* we post and then get the frame, this is intentional! */
-  if ((status = lgmpHostQueuePost(app.frameQueue, 0,
-    app.frameMemory[app.captureIndex])) != LGMP_OK)
-  {
-    DEBUG_ERROR("%s", lgmpStatusString(status));
-    return true;
-  }
+  // compute the actual post size: header + alignment gap + FrameBuffer + pixel data
+  const uint64_t frameDataSize = (uint64_t)frame.dataHeight * frame.pitch;
+  uint64_t framePostSize = fi->offset + sizeof(FrameBuffer) + frameDataSize;
+  framePostSize = (framePostSize + (app.alignSize - 1)) & ~(app.alignSize - 1);
+  app.lastFramePostSize = framePostSize;
 
-  app.iface->getFrame(
-    app.captureIndex,
-    app.frameBuffer[app.captureIndex],
-    app.maxFrameSize);
+  /* In SHM mode we post first then fill the frame data, as the client reads
+     from the same shared memory after the host writes to it.
+     In fabric mode the RDMA write sends the buffer contents at post time,
+     so we must fill the frame data first. */
+  if (app.useSHM)
+  {
+    if ((status = lgmpHostQueuePost(app.frameQueue, 0,
+      app.frameMemory[app.captureIndex])) != LGMP_OK)
+    {
+      DEBUG_ERROR("%s", lgmpStatusString(status));
+      return true;
+    }
+
+    app.iface->getFrame(
+      app.captureIndex,
+      app.frameBuffer[app.captureIndex],
+      app.maxFrameSize);
+  }
+  else
+  {
+    app.iface->getFrame(
+      app.captureIndex,
+      app.frameBuffer[app.captureIndex],
+      app.maxFrameSize);
+
+    if ((status = lgmpHostQueuePostSized(app.frameQueue, 0,
+      app.frameMemory[app.captureIndex], framePostSize)) != LGMP_OK)
+    {
+      DEBUG_ERROR("%s", lgmpStatusString(status));
+      return true;
+    }
+  }
 
   app.readIndex = app.captureIndex;
   if (++app.captureIndex == LGMP_Q_FRAME_LEN)
@@ -723,18 +775,42 @@ static bool newKVMFRData(KVMFRUserData * dst)
   return true;
 }
 
-static bool lgmpSetup(struct IVSHMEM * shmDev)
+static bool lgmpSetup(const char * localUri, struct IVSHMEM * shmDev)
 {
   KVMFRUserData udata = { 0 };
   if (!newKVMFRData(&udata))
     goto fail_init;
 
   LGMP_STATUS status;
-  if ((status = lgmpHostInit(shmDev->mem, shmDev->size, &app.lgmp,
-          udata.used, udata.data)) != LGMP_OK)
+
+  if (localUri)
   {
-    DEBUG_ERROR("lgmpHostInit Failed: %s", lgmpStatusString(status));
+#ifdef ENABLE_FABRIC
+    if ((status = lgmpFabricHostInit(localUri, &app.lgmp,
+            udata.used, udata.data)) != LGMP_OK)
+    {
+      DEBUG_ERROR("lgmpFabricHostInit Failed: %s", lgmpStatusString(status));
+      goto fail_init;
+    }
+#else
+    DEBUG_ERROR("Fabric transport is not available in this build. "
+      "Rebuild with -DENABLE_FABRIC=ON");
     goto fail_init;
+#endif
+  }
+  else
+  {
+    if (!shmDev)
+    {
+      DEBUG_ERROR("SHM transport requires an IVSHMEM device");
+      goto fail_init;
+    }
+    if ((status = lgmpHostInit(shmDev->mem, shmDev->size, &app.lgmp,
+            udata.used, udata.data)) != LGMP_OK)
+    {
+      DEBUG_ERROR("lgmpHostInit Failed: %s", lgmpStatusString(status));
+      goto fail_init;
+    }
   }
 
   if ((status = lgmpHostQueueNew(app.lgmp, FRAME_QUEUE_CONFIG, &app.frameQueue)) != LGMP_OK)
@@ -751,7 +827,7 @@ static bool lgmpSetup(struct IVSHMEM * shmDev)
 
   for(int i = 0; i < LGMP_Q_POINTER_LEN; ++i)
   {
-    if ((status = lgmpHostMemAlloc(app.lgmp, sizeof(KVMFRCursor), &app.pointerMemory[i])) != LGMP_OK)
+    if ((status = lgmpHostMemAlloc(app.pointerQueue, sizeof(KVMFRCursor), &app.pointerMemory[i])) != LGMP_OK)
     {
       DEBUG_ERROR("lgmpHostMemAlloc Failed (Pointer): %s", lgmpStatusString(status));
       goto fail_lgmp;
@@ -761,7 +837,7 @@ static bool lgmpSetup(struct IVSHMEM * shmDev)
 
   for(int i = 0; i < POINTER_SHAPE_BUFFERS; ++i)
   {
-    if ((status = lgmpHostMemAlloc(app.lgmp, MAX_POINTER_SIZE, &app.pointerShapeMemory[i])) != LGMP_OK)
+    if ((status = lgmpHostMemAlloc(app.pointerQueue, MAX_POINTER_SIZE, &app.pointerShapeMemory[i])) != LGMP_OK)
     {
       DEBUG_ERROR("lgmpHostMemAlloc Failed (Pointer Shapes): %s", lgmpStatusString(status));
       goto fail_lgmp;
@@ -769,14 +845,31 @@ static bool lgmpSetup(struct IVSHMEM * shmDev)
     memset(lgmpHostMemPtr(app.pointerShapeMemory[i]), 0, MAX_POINTER_SIZE);
   }
 
-  app.maxFrameSize = lgmpHostMemAvail(app.lgmp);
+  app.maxFrameSize = lgmpHostMemAvail(app.frameQueue);
   app.maxFrameSize = (app.maxFrameSize - (app.alignSize - 1)) & ~(app.alignSize - 1);
   app.maxFrameSize /= LGMP_Q_FRAME_LEN;
   DEBUG_INFO("Max Frame Size   : %u MiB", (unsigned int)(app.maxFrameSize / 1048576LL));
+  
+
+  const int frameSizeLimit = option_get_int("app", "frameSizeLimit");
+  if (localUri && frameSizeLimit > 0)
+  {
+    const size_t frameSizeLimitBytes =
+    (size_t)frameSizeLimit * 1048576LL;
+    if (app.maxFrameSize > frameSizeLimitBytes)
+    {
+      app.maxFrameSize = frameSizeLimitBytes;
+      app.maxFrameSize =
+      (app.maxFrameSize - (app.alignSize - 1)) & ~(app.alignSize - 1);
+      DEBUG_INFO("Frame Size Limit : %u MiB (applied)",
+      (unsigned int)(app.maxFrameSize / 1048576LL));
+    }
+  }
+
 
   for(int i = 0; i < LGMP_Q_FRAME_LEN; ++i)
   {
-    if ((status = lgmpHostMemAllocAligned(app.lgmp, app.maxFrameSize,
+    if ((status = lgmpHostMemAllocAligned(app.frameQueue, app.maxFrameSize,
             app.alignSize, &app.frameMemory[i])) != LGMP_OK)
     {
       DEBUG_ERROR("lgmpHostMemAlloc Failed (Frame): %s", lgmpStatusString(status));
@@ -868,23 +961,45 @@ int app_main(int argc, char * argv[])
   DEBUG_INFO("Looking Glass Host (%s)", BUILD_VERSION);
   cpuInfo_log();
 
-  struct IVSHMEM shmDev = { 0 };
-  if (!ivshmemInit(&shmDev))
-  {
-    DEBUG_ERROR("Failed to find the IVSHMEM device");
-    return LG_HOST_EXIT_FATAL;
-  }
+  const char * localUri = option_get_string("fabric", "localUri");
+  bool useSHM = (localUri == NULL);
+  app.useSHM = useSHM;
 
-  if (!ivshmemOpen(&shmDev))
+#ifdef ENABLE_FABRIC
+  if (!useSHM && option_get_bool("fabric", "debug"))
+    lgmpSetLogLevel(LGMP_LOG_LEVEL_DEBUG);
+#endif
+
+  struct IVSHMEM shmDev = { 0 };
+
+  if (useSHM)
   {
-    DEBUG_ERROR("Failed to open the IVSHMEM device");
-    return LG_HOST_EXIT_FATAL;
+    if (!ivshmemInit(&shmDev))
+    {
+      DEBUG_ERROR("Failed to find the IVSHMEM device");
+      return LG_HOST_EXIT_FATAL;
+    }
+
+    if (!ivshmemOpen(&shmDev))
+    {
+      DEBUG_ERROR("Failed to open the IVSHMEM device");
+      return LG_HOST_EXIT_FATAL;
+    }
+    app.ivshmemBase = shmDev.mem;
   }
-  app.ivshmemBase = shmDev.mem;
 
   int exitcode  = 0;
-  DEBUG_INFO("IVSHMEM Size     : %u MiB", shmDev.size / 1048576);
-  DEBUG_INFO("IVSHMEM Address  : 0x%" PRIXPTR, (uintptr_t)shmDev.mem);
+
+  if (useSHM)
+  {
+    DEBUG_INFO("IVSHMEM Size     : %u MiB", shmDev.size / 1048576);
+    DEBUG_INFO("IVSHMEM Address  : 0x%" PRIXPTR, (uintptr_t)shmDev.mem);
+  }
+  else
+  {
+    DEBUG_INFO("Fabric URI       : %s", localUri);
+  }
+
   DEBUG_INFO("Max Pointer Size : %u KiB", (unsigned int)MAX_POINTER_SIZE / 1024);
   DEBUG_INFO("KVMFR Version    : %u", KVMFR_VERSION);
 
@@ -951,7 +1066,7 @@ int app_main(int argc, char * argv[])
         "Asynchronous" : "Synchronous");
   }
 
-  if (!lgmpSetup(&shmDev))
+  if (!lgmpSetup(localUri, useSHM ? &shmDev : NULL))
   {
     exitcode = LG_HOST_EXIT_FATAL;
     goto fail_ivshmem;
@@ -969,7 +1084,7 @@ int app_main(int argc, char * argv[])
       case LGMP_TIMER_STATE_CORRUPTED:
         DEBUG_INFO("Performing LGMP reinitialization");
         lgmpShutdown();
-        if (!lgmpSetup(&shmDev))
+        if (!lgmpSetup(localUri, useSHM ? &shmDev : NULL))
           goto fail_lgmp;
         break;
 
@@ -1048,8 +1163,9 @@ int app_main(int argc, char * argv[])
                   lgmpHostQueueNewSubs(app.frameQueue) > 0))
             {
               LGMP_STATUS status;
-              if ((status = lgmpHostQueuePost(app.frameQueue, 0,
-                      app.frameMemory[app.readIndex])) != LGMP_OK)
+              if ((status = lgmpHostQueuePostSized(app.frameQueue, 0,
+                      app.frameMemory[app.readIndex],
+                      app.lastFramePostSize)) != LGMP_OK)
                 DEBUG_ERROR("%s", lgmpStatusString(status));
             }
         }
@@ -1099,8 +1215,11 @@ fail_lgmp:
   lgmpShutdown();
 
 fail_ivshmem:
-  ivshmemClose(&shmDev);
-  ivshmemFree(&shmDev);
+  if (useSHM)
+  {
+    ivshmemClose(&shmDev);
+    ivshmemFree(&shmDev);
+  }
   DEBUG_INFO("Host application exited");
   return exitcode;
 }

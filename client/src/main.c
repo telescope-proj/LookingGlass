@@ -709,6 +709,10 @@ int main_frameThread(void * unused)
       g_state.formatValid = true;
       formatVer = frame->formatVer;
 
+      // Avoid out of bounds access to FrameTypeStr
+      if (frame->type >= FRAME_TYPE_MAX || frame->type < FRAME_TYPE_INVALID)
+        frame->type = FRAME_TYPE_INVALID;
+
       DEBUG_INFO("Format: %s %ux%u (%ux%u) stride:%u pitch:%u rotation:%d hdr:%d pq:%d",
           FrameTypeStr[frame->type],
           frame->frameWidth, frame->frameHeight,
@@ -1250,11 +1254,19 @@ static int lg_run(void)
   signal(SIGINT , intHandler);
   signal(SIGTERM, intHandler);
 
-  // try map the shared memory
-  if (!ivshmemOpen(&g_state.shm))
+  bool useFabric = false;
+#ifdef ENABLE_FABRIC
+  useFabric = g_params.localUri && g_params.remoteUri;
+#endif
+
+  // try map the shared memory (only needed for SHM transport)
+  if (!useFabric)
   {
-    DEBUG_ERROR("Failed to map memory");
-    return -1;
+    if (!ivshmemOpen(&g_state.shm))
+    {
+      DEBUG_ERROR("Failed to map memory");
+      return -1;
+    }
   }
 
   // setup the spice startup condition
@@ -1340,6 +1352,7 @@ static int lg_run(void)
   }
 
   g_state.useDMA =
+    !useFabric &&
     g_params.allowDMA &&
     ivshmemHasDMA(&g_state.shm);
 
@@ -1423,7 +1436,20 @@ static int lg_run(void)
 
   while(g_state.state == APP_STATE_RUNNING)
   {
-    if ((status = lgmpClientInit(g_state.shm.mem, g_state.shm.size, &g_state.lgmp)) == LGMP_OK)
+#ifdef ENABLE_FABRIC
+    if (useFabric)
+    {
+      status = lgmpFabricClientInit(
+        g_params.localUri, g_params.remoteUri, &g_state.lgmp);
+    }
+    else
+#endif
+    {
+      status = lgmpClientInit(
+        g_state.shm.mem, g_state.shm.size, &g_state.lgmp);
+    }
+
+    if (status == LGMP_OK)
       break;
 
     DEBUG_ERROR("lgmpClientInit Failed: %s", lgmpStatusString(status));
@@ -1489,6 +1515,7 @@ restart:
 
       case LGMP_ERR_INVALID_SESSION:
       case LGMP_ERR_INVALID_MAGIC:
+      case LGMP_ERR_TRANSPORT_CONNECT_FAILURE:
       {
         if (waitCount++ == 0)
         {
@@ -1653,31 +1680,37 @@ restart:
             guestCPUPt = true;
         }
 
-        if (hostHasSMP && !guestHasSMP)
+        // If we are using the fabric backend, host and client CPU configuration
+        // mismatches are expected and not an issue. Suppress the VM-specific
+        // warnings.
+        if (!useFabric)
         {
-          DEBUG_BREAK();
-          DEBUG_WARN(
+          if (hostHasSMP && !guestHasSMP)
+          {
+            DEBUG_BREAK();
+            DEBUG_WARN(
               "I have detected you have a CPU with hyperthreads but your guest"
               " is not aware of this");
-          DEBUG_WARN(
-              "This will result in a degredation of latency sensitive tasks"
-              " including the use of Looking Glass");
+            DEBUG_WARN(
+                "This will result in a degradation of latency sensitive tasks"
+                " including the use of Looking Glass");
 
-          if (hostIsAMD)
-            DEBUG_WARN("As you have an AMD CPU, please be sure you have enabled"
-                " the `topoext` cpu feature flag for your virtual machine");
-          DEBUG_BREAK();
-        }
+            if (hostIsAMD)
+              DEBUG_WARN("As you have an AMD CPU, please be sure you have enabled"
+                  " the `topoext` cpu feature flag for your virtual machine");
+            DEBUG_BREAK();
+          }
 
-        if (!guestCPUPt)
-        {
-          DEBUG_BREAK();
-          DEBUG_WARN(
-              "Your guest is unaware of the acceleration features your CPU has");
-          DEBUG_WARN(
-              "Please be sure to set your CPU type to `host-passthrough` in"
-              " your VM configuration");
-          DEBUG_BREAK();
+          if (!guestCPUPt)
+          {
+            DEBUG_BREAK();
+            DEBUG_WARN(
+                "Your guest is unaware of the acceleration features your CPU has");
+            DEBUG_WARN(
+                "Please be sure to set your CPU type to `host-passthrough` in"
+                " your VM configuration");
+            DEBUG_BREAK();
+          }
         }
 
         bool uuidValid = false;

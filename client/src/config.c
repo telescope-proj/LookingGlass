@@ -32,6 +32,10 @@
 #include <unistd.h>
 #include <string.h>
 
+#ifdef ENABLE_FABRIC
+#include "lgmp/lgmp.h" // fabric backend logging
+#endif
+
 // forwards
 static bool       optRendererParse     (struct Option * opt, const char * str);
 static StringList optRendererValues    (struct Option * opt);
@@ -567,6 +571,29 @@ static struct Option options[] =
     .type           = OPTION_TYPE_BOOL,
     .value.x_bool   = true
   },
+#ifdef ENABLE_FABRIC
+  {
+    .module         = "fabric",
+    .name           = "localUri",
+    .description    = "URI of local endpoint/NIC (tcp://addr:port or rdma://addr:port)",
+    .type           = OPTION_TYPE_STRING,
+    .value.x_string = NULL,
+  },
+  {
+    .module         = "fabric",
+    .name           = "remoteUri",
+    .description    = "URI of remote endpoint/NIC (tcp://addr:port or rdma://addr:port)",
+    .type           = OPTION_TYPE_STRING,
+    .value.x_string = NULL,
+  },
+  {
+    .module         = "fabric",
+    .name           = "debug",
+    .description    = "Enable debug logging for the fabric transport",
+    .type           = OPTION_TYPE_BOOL,
+    .value.x_bool   = false,
+  },
+#endif
   {0}
 };
 
@@ -767,6 +794,13 @@ bool config_load(int argc, char * argv[])
   g_params.audioBufferLatency = option_get_int("audio", "bufferLatency");
   g_params.micShowIndicator   = option_get_bool("audio", "micShowIndicator");
   g_params.audioSyncVolume = option_get_bool("audio", "syncVolume");
+
+#ifdef ENABLE_FABRIC
+  g_params.localUri             = option_get_string("fabric"  , "localUri"          );
+  g_params.remoteUri            = option_get_string("fabric"  , "remoteUri"         );
+  if (g_params.localUri && option_get_bool("fabric", "debug"))
+    lgmpSetLogLevel(LGMP_LOG_LEVEL_DEBUG);
+#endif
 
   return true;
 }

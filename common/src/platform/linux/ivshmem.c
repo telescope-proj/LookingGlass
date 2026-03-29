@@ -46,6 +46,13 @@ struct IVSHMEMInfo
 
 static bool ivshmemDeviceValidator(struct Option * opt, const char ** error)
 {
+#ifdef ENABLE_FABRIC
+  // shmFile is only relevant for SHM transport, ignore for fabric
+  const char * localUri = option_get_string("fabric", "localUri");
+  if (localUri)
+    return true;
+#endif
+
   // if it's not a kvmfr device, it must be a file on disk
   if (strlen(opt->value.x_string) > 3 && memcmp(opt->value.x_string, "kvmfr", 5) != 0)
   {
