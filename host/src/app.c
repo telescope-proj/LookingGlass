@@ -851,7 +851,7 @@ static bool lgmpSetup(const char * localUri, struct IVSHMEM * shmDev)
   DEBUG_INFO("Max Frame Size   : %u MiB", (unsigned int)(app.maxFrameSize / 1048576LL));
   
 
-  const int frameSizeLimit = option_get_int("app", "frameSizeLimit");
+  const int frameSizeLimit = option_get_int("fabric", "frameSizeLimit");
   if (localUri && frameSizeLimit > 0)
   {
     const size_t frameSizeLimitBytes =
