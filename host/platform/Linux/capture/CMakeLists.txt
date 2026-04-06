@@ -5,6 +5,11 @@ include("PreCapture")
 
 option(USE_XCB "Enable XSHM Support" ON)
 option(USE_PIPEWIRE "Enable PipeWire Support" ON)
+option(USE_DUMMY "Enable dummy capture backend" OFF)
+
+if (USE_DUMMY)
+  add_capture("dummy")
+endif()
 
 if (USE_XCB)
   add_capture("XCB")
@@ -16,6 +21,7 @@ endif()
 
 add_feature_info(USE_XCB USE_XCB "XCB/XSHM capture backend.")
 add_feature_info(USE_PIPEWIRE USE_PIPEWIRE "Pipewire Screencast capture backend.")
+add_feature_info(USE_DUMMY USE_DUMMY "Dummy capture backend for development.")
 
 include("PostCapture")
 

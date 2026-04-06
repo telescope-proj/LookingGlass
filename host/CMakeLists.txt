@@ -106,11 +106,19 @@ if(WIN32)
 else()
   add_executable(looking-glass-host ${SOURCES})
 endif()
+option(ENABLE_FABRIC "Enable fabric (network) transport support" OFF)
+add_feature_info(ENABLE_FABRIC ENABLE_FABRIC "Fabric network transport.")
+
 target_link_libraries(looking-glass-host
   lg_common
   platform
   lgmp
 )
+
+if(ENABLE_FABRIC)
+  target_compile_definitions(looking-glass-host PRIVATE ENABLE_FABRIC)
+  target_compile_definitions(lg_common_platform_code PRIVATE ENABLE_FABRIC)
+endif()
 
 if(WIN32)
   set_target_properties(looking-glass-host PROPERTIES LINK_FLAGS "-Wl,--gc-sections -Wl,--nxcompat")

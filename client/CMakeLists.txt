@@ -48,6 +48,9 @@ add_feature_info(ENABLE_PIPEWIRE ENABLE_PIPEWIRE "PipeWire audio support.")
 option(ENABLE_PULSEAUDIO "Build with PulseAudio audio output support" ON)
 add_feature_info(ENABLE_PULSEAUDIO ENABLE_PULSEAUDIO "PulseAudio audio support.")
 
+option(ENABLE_FABRIC "Enable fabric (network) transport support" OFF)
+add_feature_info(ENABLE_FABRIC ENABLE_FABRIC "Fabric network transport.")
+
 add_compile_options(
   "-Wall"
   "-Wextra"
@@ -167,6 +170,10 @@ target_link_libraries(looking-glass-client
   renderers
   cimgui
 )
+
+if(ENABLE_FABRIC)
+  target_compile_definitions(looking-glass-client PUBLIC ENABLE_FABRIC)
+endif()
 
 if (ENABLE_PIPEWIRE OR ENABLE_PULSEAUDIO)
   add_definitions(-D ENABLE_AUDIO)
