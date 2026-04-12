@@ -1449,7 +1449,7 @@ static int lg_run(void)
     else
 #endif
     {
-      status = lgmpClientInit(
+      status = lgmpShmClientInit(
         g_state.shm.mem, g_state.shm.size, &g_state.lgmp);
     }
 

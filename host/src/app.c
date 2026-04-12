@@ -805,10 +805,10 @@ static bool lgmpSetup(const char * localUri, struct IVSHMEM * shmDev)
       DEBUG_ERROR("SHM transport requires an IVSHMEM device");
       goto fail_init;
     }
-    if ((status = lgmpHostInit(shmDev->mem, shmDev->size, &app.lgmp,
+    if ((status = lgmpShmHostInit(shmDev->mem, shmDev->size, &app.lgmp,
             udata.used, udata.data)) != LGMP_OK)
     {
-      DEBUG_ERROR("lgmpHostInit Failed: %s", lgmpStatusString(status));
+      DEBUG_ERROR("lgmpShmHostInit Failed: %s", lgmpStatusString(status));
       goto fail_init;
     }
   }

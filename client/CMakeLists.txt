@@ -171,8 +171,12 @@ target_link_libraries(looking-glass-client
   cimgui
 )
 
+if(ENABLE_SHM)
+  target_link_libraries(looking-glass-client lgmp_shm)
+endif()
+
 if(ENABLE_FABRIC)
-  target_compile_definitions(looking-glass-client PUBLIC ENABLE_FABRIC)
+  target_link_libraries(looking-glass-client lgmp_fabric)
 endif()
 
 if (ENABLE_PIPEWIRE OR ENABLE_PULSEAUDIO)

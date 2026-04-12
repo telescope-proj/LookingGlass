@@ -115,8 +115,12 @@ target_link_libraries(looking-glass-host
   lgmp
 )
 
+if(ENABLE_SHM)
+  target_link_libraries(looking-glass-host lgmp_shm)
+endif()
+
 if(ENABLE_FABRIC)
-  target_compile_definitions(looking-glass-host PRIVATE ENABLE_FABRIC)
+  target_link_libraries(looking-glass-host lgmp_fabric)
   target_compile_definitions(lg_common_platform_code PRIVATE ENABLE_FABRIC)
 endif()
 
