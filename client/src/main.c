@@ -1439,8 +1439,12 @@ static int lg_run(void)
 #ifdef ENABLE_FABRIC
     if (useFabric)
     {
-      status = lgmpFabricClientInit(
-        g_params.localUri, g_params.remoteUri, &g_state.lgmp);
+      LGMPFabricClientInitOpts opts;
+      memset(&opts, 0, sizeof(opts));
+      opts.localUri     = g_params.localUri;
+      opts.remoteUri    = g_params.remoteUri;
+      opts.enableDMABUF = false;
+      status = lgmpFabricClientInit(&opts, &g_state.lgmp);
     }
     else
 #endif
