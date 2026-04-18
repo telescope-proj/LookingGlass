@@ -973,7 +973,7 @@ int app_main(int argc, char * argv[])
     {
       case 0: break;
       case 1: lgmpSetLogLevel(LGMP_LOG_LEVEL_ERROR); break;
-      case 2: lgmpSetLogLevel(LGMP_LOG_LEVEL_WARN); break;
+      case 2: lgmpSetLogLevel(LGMP_LOG_LEVEL_WARNING); break;
       case 3: lgmpSetLogLevel(LGMP_LOG_LEVEL_INFO); break;
       case 4: lgmpSetLogLevel(LGMP_LOG_LEVEL_DEBUG); break;
       case 5: lgmpSetLogLevel(LGMP_LOG_LEVEL_TRACE); break;
