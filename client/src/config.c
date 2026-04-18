@@ -588,10 +588,10 @@ static struct Option options[] =
   },
   {
     .module         = "fabric",
-    .name           = "debug",
-    .description    = "Enable debug logging for the fabric transport",
-    .type           = OPTION_TYPE_BOOL,
-    .value.x_bool   = false,
+    .name           = "logLevel",
+    .description    = "Set the logging level for fabric operations",
+    .type           = OPTION_TYPE_INT,
+    .value.x_int    = 0,
   },
 #endif
   {0}
@@ -798,8 +798,21 @@ bool config_load(int argc, char * argv[])
 #ifdef ENABLE_FABRIC
   g_params.localUri             = option_get_string("fabric"  , "localUri"          );
   g_params.remoteUri            = option_get_string("fabric"  , "remoteUri"         );
-  if (g_params.localUri && option_get_bool("fabric", "debug"))
-    lgmpSetLogLevel(LGMP_LOG_LEVEL_DEBUG);
+  if (g_params.localUri)
+  {
+    int debugLevel = option_get_int("fabric", "logLevel");
+    switch (debugLevel)
+    {
+      case 0: break;
+      case 1: lgmpSetLogLevel(LGMP_LOG_LEVEL_ERROR); break;
+      case 2: lgmpSetLogLevel(LGMP_LOG_LEVEL_WARN); break;
+      case 3: lgmpSetLogLevel(LGMP_LOG_LEVEL_INFO); break;
+      case 4: lgmpSetLogLevel(LGMP_LOG_LEVEL_DEBUG); break;
+      case 5: lgmpSetLogLevel(LGMP_LOG_LEVEL_TRACE); break;
+      default:
+        DEBUG_WARN("fabric:debug set to invalid value: %d", debugLevel);
+    }
+  }
 #endif
 
   return true;
